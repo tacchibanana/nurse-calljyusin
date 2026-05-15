@@ -75,6 +75,14 @@
         .card.consult { border-left-color: var(--accent-green); }
         .done-btn { width: 100%; margin-top: 15px; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
+        /* 大量生成用のストック一覧表示スタイル */
+        .qr-stock-title { margin-top: 40px; border-top: 2px dashed var(--border-color); padding-top: 20px; font-size: 1.3rem; }
+        .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .qr-stock-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
+        .qr-stock-card h4 { margin: 0 0 5px 0; font-size: 1.4rem; color: var(--primary-color); }
+        .qr-stock-card p { margin: 0 0 10px 0; font-size: 0.9rem; color: #777; }
+        .mini-print-btn { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.9rem; }
+
         /* --- 印刷用 --- */
         #print-area { display: none; }
         @media print {
@@ -133,12 +141,18 @@
     </div>
 
     <div id="qr-section" class="content-section">
-        <div style="max-width: 500px; margin: auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-            <h2>QRコード作成</h2>
-            <input type="text" id="in-room" placeholder="部屋番号" style="width:100%; padding:10px; margin-bottom:10px;">
-            <input type="text" id="in-name" placeholder="お名前（任意）" style="width:100%; padding:10px; margin-bottom:10px;">
-            <input type="text" id="sender-url" value="https://nursecallapp-bac29.web.app" style="width:100%; padding:10px; margin-bottom:20px;">
-            <button class="done-btn" onclick="preparePrint()" style="background:#28a745;">🖨️ A4サイズで印刷する</button>
+        <div style="max-width: 600px; margin: auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+            <h2>QRコード新規作成</h2>
+            <input type="text" id="in-room" placeholder="部屋番号 (例: 205-A)" style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; font-size:1rem;">
+            <input type="text" id="in-name" placeholder="お名前（任意 例: 山田）" style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; font-size:1rem;">
+            
+            <input type="hidden" id="sender-url" value="https://tacchibanana.github.io/nurse-callsosin/">
+            
+            <button class="done-btn" onclick="generateAndRegister()" style="background:#007bff; margin-bottom:10px;">✨ 一覧に追加して印刷用データを作る</button>
+            
+            <h3 class="qr-stock-title">📦 作成済みQRコード一覧 (区別・再印刷用)</h3>
+            <div class="qr-grid" id="qr-stock-list">
+                </div>
         </div>
     </div>
 </div>
@@ -166,6 +180,9 @@
     const urgentAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
     urgentAudio.loop = true;
 
+    // 大量管理用のデータ配列
+    let qrStockData = [];
+
     // --- UI用関数群 ---
     window.toggleNightMode = () => {
         document.body.classList.toggle('night-mode');
@@ -183,14 +200,59 @@
         document.getElementById('stop-alarm-btn').style.display = 'none';
     };
 
-    window.preparePrint = () => {
-        const room = document.getElementById('in-room').value;
+    // 新規追加してストック一覧を更新する処理
+    window.generateAndRegister = () => {
+        const room = document.getElementById('in-room').value.trim();
+        const name = document.getElementById('in-name').value.trim();
         if (!room) return alert("部屋番号を入力してください");
+
+        // 重複チェック（既存にあれば上書きまたはスキップ）
+        const exists = qrStockData.some(item => item.room === room);
+        if (!exists) {
+            qrStockData.push({ room, name });
+            updateStockListUI();
+        }
+
+        // 即座に印刷画面を開く
+        window.preparePrint(room, name);
+        
+        // 入力欄をクリアして次の入力をしやすくする
+        document.getElementById('in-room').value = "";
+        document.getElementById('in-name').value = "";
+    };
+
+    // 一覧の表示を更新する処理
+    function updateStockListUI() {
+        const listContainer = document.getElementById('qr-stock-list');
+        listContainer.innerHTML = "";
+
+        qrStockData.forEach(item => {
+            const stockCard = document.createElement('div');
+            stockCard.className = 'qr-stock-card';
+            stockCard.innerHTML = `
+                <h4>🚪 ${item.room}</h4>
+                <p>${item.name ? '👤 ' + item.name + ' 様' : '（名前なし）'}</p>
+                <button class="mini-print-btn" onclick="preparePrint('${item.room}', '${item.name}')">🖨️ 印刷</button>
+            `;
+            listContainer.appendChild(stockCard);
+        });
+    }
+
+    // A4印刷用モーダル立ち上げ処理
+    window.preparePrint = (room, name) => {
         document.getElementById('out-room').innerText = room;
-        document.getElementById('out-name').innerText = document.getElementById('in-name').value;
+        document.getElementById('out-name').innerText = name ? name + " 様" : "";
+        
+        const baseUrl = document.getElementById('sender-url').value;
         const qrContainer = document.getElementById('qrcode');
         qrContainer.innerHTML = "";
-        new QRCode(qrContainer, { text: `${document.getElementById('sender-url').value}?room=${encodeURIComponent(room)}`, width: 250, height: 250 });
+        
+        // パラメータに部屋番号と名前を紐付け
+        const finalUrl = `${baseUrl}?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`;
+        
+        new QRCode(qrContainer, { text: finalUrl, width: 250, height: 250 });
+        
+        // 少し待ってから印刷ダイアログを起動
         setTimeout(() => window.print(), 600);
     };
 
@@ -222,7 +284,6 @@
                         <div style="margin:10px 0; font-size:1.2rem;">${data.menu.join(' / ')}</div>
                         <button class="done-btn" onclick="completeCall('${id}')">対応完了</button>
                     `;
-                    // 常に最新が上に来るように挿入
                     board.insertBefore(card, board.firstChild);
 
                     if (data.priority === 'urgent') {
