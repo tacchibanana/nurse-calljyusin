@@ -68,20 +68,31 @@
         .content-section { display: none; padding: 20px; }
         .content-section.active { display: block; }
 
+        /* 受信カード */
         .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 10px solid #ccc; }
         .card.urgent { border-left-color: var(--accent-red); }
         .card.normal { border-left-color: var(--accent-orange); }
         .card.consult { border-left-color: var(--accent-green); }
+        .priority-badge { font-size: 0.9rem; font-weight: bold; padding: 4px 8px; border-radius: 5px; }
+        .badge-urgent { background: #ffebeb; color: var(--accent-red); }
+        .badge-normal { background: #fff8eb; color: var(--accent-orange); }
+        .badge-consult { background: #eff8ef; color: var(--accent-green); }
         .done-btn { width: 100%; margin-top: 15px; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-        /* 大量生成用のストック一覧表示スタイル */
+        /* QR一覧 */
         .qr-stock-title { margin-top: 40px; border-top: 2px dashed var(--border-color); padding-top: 20px; font-size: 1.3rem; }
         .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .qr-stock-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
         .qr-stock-card h4 { margin: 0 0 5px 0; font-size: 1.4rem; color: var(--primary-color); }
         .qr-stock-card p { margin: 0 0 10px 0; font-size: 0.9rem; color: #777; }
         .mini-print-btn { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.9rem; }
+
+        /* 設定画面 */
+        .settings-group { margin-bottom: 25px; background: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .settings-group label { display: block; margin-top: 15px; font-weight: bold; font-size: 0.95rem; }
+        .settings-group select, .settings-group input[type="range"] { width: 100%; margin-top: 5px; padding: 10px; box-sizing: border-box; font-size: 1rem; }
+        .test-btn { margin-top: 15px; padding: 10px 20px; background: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
         /* --- 印刷用 --- */
         #print-area { display: none; }
@@ -129,6 +140,7 @@
         <div class="nav-icons">
             <button class="icon-btn active" id="btn-board" onclick="switchTab('board-section', this)">📋</button>
             <button class="icon-btn" id="btn-qr" onclick="switchTab('qr-section', this)">➕</button>
+            <button class="icon-btn" id="btn-settings" onclick="switchTab('settings-section', this)">⚙️</button>
         </div>
         <div class="header-controls">
             <button id="stop-alarm-btn" class="stop-alarm-btn" onclick="stopAlarm()">🔕</button>
@@ -145,14 +157,42 @@
             <h2>QRコード新規作成</h2>
             <input type="text" id="in-room" placeholder="部屋番号 (例: 205-A)" style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; font-size:1rem;">
             <input type="text" id="in-name" placeholder="お名前（任意 例: 山田）" style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; font-size:1rem;">
-            
             <input type="hidden" id="sender-url" value="https://tacchibanana.github.io/nurse-callsosin/">
-            
             <button class="done-btn" onclick="generateAndRegister()" style="background:#007bff; margin-bottom:10px;">✨ 一覧に追加して印刷用データを作る</button>
-            
             <h3 class="qr-stock-title">📦 作成済みQRコード一覧 (区別・再印刷用)</h3>
-            <div class="qr-grid" id="qr-stock-list">
-                </div>
+            <div class="qr-grid" id="qr-stock-list"></div>
+        </div>
+    </div>
+
+    <div id="settings-section" class="content-section">
+        <div style="max-width: 600px; margin: auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+            <h2>⚙️ 音声・通知設定</h2>
+            
+            <div class="settings-group">
+                <h3 style="color: var(--accent-red); margin-top:0;">🚨 緊急アラーム (すぐ来て)</h3>
+                <label>音の種類:</label>
+                <select id="urgent-sound" onchange="updateAudioSettings()">
+                    <option value="https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3">激しいアラーム (デフォルト)</option>
+                    <option value="https://assets.mixkit.co/active_storage/sfx/2861/2861-preview.mp3">電子音アラーム (ピッピッピッ)</option>
+                    <option value="https://assets.mixkit.co/active_storage/sfx/1008/1008-preview.mp3">警告音 (ブーブー)</option>
+                </select>
+                <label>音量:</label>
+                <input type="range" id="urgent-volume" min="0" max="1" step="0.1" value="1" onchange="updateAudioSettings()">
+                <button class="test-btn" onclick="testAudio('urgent')">▶️ テスト再生（3秒間）</button>
+            </div>
+
+            <div class="settings-group">
+                <h3 style="color: var(--accent-orange); margin-top:0;">🟡 通常チャイム (急がない / 相談)</h3>
+                <label>音の種類:</label>
+                <select id="normal-sound" onchange="updateAudioSettings()">
+                    <option value="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3">ピンポーン (デフォルト)</option>
+                    <option value="https://assets.mixkit.co/active_storage/sfx/1131/1131-preview.mp3">やさしい通知音 (ポーン)</option>
+                    <option value="https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3">軽快なチャイム (ティロリン)</option>
+                </select>
+                <label>音量:</label>
+                <input type="range" id="normal-volume" min="0" max="1" step="0.1" value="1" onchange="updateAudioSettings()">
+                <button class="test-btn" onclick="testAudio('normal')">▶️ テスト再生</button>
+            </div>
         </div>
     </div>
 </div>
@@ -176,18 +216,56 @@
     const app = initializeApp(firebaseConfig);
     const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
-    const normalAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    const urgentAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
-    urgentAudio.loop = true;
+    // --- 音声設定の読み込みと適用 ---
+    const savedUrgentSound = localStorage.getItem('urgentSound') || 'https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3';
+    const savedUrgentVolume = localStorage.getItem('urgentVolume') !== null ? localStorage.getItem('urgentVolume') : 1;
+    const savedNormalSound = localStorage.getItem('normalSound') || 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+    const savedNormalVolume = localStorage.getItem('normalVolume') !== null ? localStorage.getItem('normalVolume') : 1;
 
-    // 大量管理用のデータ配列
+    const urgentAudio = new Audio(savedUrgentSound);
+    urgentAudio.loop = true;
+    urgentAudio.volume = savedUrgentVolume;
+
+    const normalAudio = new Audio(savedNormalSound);
+    normalAudio.volume = savedNormalVolume;
+
+    // UIに保存された値をセット
+    document.getElementById('urgent-sound').value = savedUrgentSound;
+    document.getElementById('urgent-volume').value = savedUrgentVolume;
+    document.getElementById('normal-sound').value = savedNormalSound;
+    document.getElementById('normal-volume').value = savedNormalVolume;
+
+    window.updateAudioSettings = () => {
+        const uS = document.getElementById('urgent-sound').value;
+        const uV = document.getElementById('urgent-volume').value;
+        const nS = document.getElementById('normal-sound').value;
+        const nV = document.getElementById('normal-volume').value;
+
+        urgentAudio.src = uS; urgentAudio.volume = uV;
+        normalAudio.src = nS; normalAudio.volume = nV;
+
+        localStorage.setItem('urgentSound', uS);
+        localStorage.setItem('urgentVolume', uV);
+        localStorage.setItem('normalSound', nS);
+        localStorage.setItem('normalVolume', nV);
+    };
+
+    window.testAudio = (type) => {
+        if (type === 'urgent') {
+            urgentAudio.currentTime = 0;
+            urgentAudio.play().catch(()=>{});
+            setTimeout(() => { urgentAudio.pause(); urgentAudio.currentTime = 0; }, 3000);
+        } else {
+            normalAudio.currentTime = 0;
+            normalAudio.play().catch(()=>{});
+        }
+    };
+
     let qrStockData = [];
 
     // --- UI用関数群 ---
-    window.toggleNightMode = () => {
-        document.body.classList.toggle('night-mode');
-    };
-
+    window.toggleNightMode = () => document.body.classList.toggle('night-mode');
+    
     window.switchTab = (id, el) => {
         document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.icon-btn').forEach(b => b.classList.remove('active'));
@@ -200,32 +278,24 @@
         document.getElementById('stop-alarm-btn').style.display = 'none';
     };
 
-    // 新規追加してストック一覧を更新する処理
     window.generateAndRegister = () => {
         const room = document.getElementById('in-room').value.trim();
         const name = document.getElementById('in-name').value.trim();
         if (!room) return alert("部屋番号を入力してください");
 
-        // 重複チェック（既存にあれば上書きまたはスキップ）
         const exists = qrStockData.some(item => item.room === room);
         if (!exists) {
             qrStockData.push({ room, name });
             updateStockListUI();
         }
-
-        // 即座に印刷画面を開く
         window.preparePrint(room, name);
-        
-        // 入力欄をクリアして次の入力をしやすくする
         document.getElementById('in-room').value = "";
         document.getElementById('in-name').value = "";
     };
 
-    // 一覧の表示を更新する処理
     function updateStockListUI() {
         const listContainer = document.getElementById('qr-stock-list');
         listContainer.innerHTML = "";
-
         qrStockData.forEach(item => {
             const stockCard = document.createElement('div');
             stockCard.className = 'qr-stock-card';
@@ -238,21 +308,14 @@
         });
     }
 
-    // A4印刷用モーダル立ち上げ処理
     window.preparePrint = (room, name) => {
         document.getElementById('out-room').innerText = room;
         document.getElementById('out-name').innerText = name ? name + " 様" : "";
-        
         const baseUrl = document.getElementById('sender-url').value;
         const qrContainer = document.getElementById('qrcode');
         qrContainer.innerHTML = "";
-        
-        // パラメータに部屋番号と名前を紐付け
         const finalUrl = `${baseUrl}?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`;
-        
         new QRCode(qrContainer, { text: finalUrl, width: 250, height: 250 });
-        
-        // 少し待ってから印刷ダイアログを起動
         setTimeout(() => window.print(), 600);
     };
 
@@ -279,9 +342,19 @@
                     const card = document.createElement('div');
                     card.className = `card ${data.priority}`;
                     card.id = `card-${id}`;
+
+                    // 「急がない」などの状況を分かりやすくカードに表示
+                    let badgeHtml = "";
+                    if (data.priority === 'urgent') badgeHtml = '<span class="priority-badge badge-urgent">🚨 緊急</span>';
+                    else if (data.priority === 'normal') badgeHtml = '<span class="priority-badge badge-normal">🟡 急がない</span>';
+                    else if (data.priority === 'consult') badgeHtml = '<span class="priority-badge badge-consult">🟢 相談</span>';
+
                     card.innerHTML = `
-                        <div style="font-size:1.6rem; font-weight:bold;">${data.room}</div>
-                        <div style="margin:10px 0; font-size:1.2rem;">${data.menu.join(' / ')}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="font-size:1.6rem; font-weight:bold;">${data.room}</div>
+                            <div>${badgeHtml}</div>
+                        </div>
+                        <div style="margin:15px 0; font-size:1.3rem; font-weight:bold; color:var(--primary-color)">${data.menu.join(' / ')}</div>
                         <button class="done-btn" onclick="completeCall('${id}')">対応完了</button>
                     `;
                     board.insertBefore(card, board.firstChild);
