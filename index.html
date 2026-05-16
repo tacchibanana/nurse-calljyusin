@@ -97,11 +97,13 @@
         /* --- 印刷用 --- */
         #print-area { display: none; }
         @media print {
-            @page { size: A4 portrait; margin: 0; }
+            /* フッターとヘッダーの印刷を消すためのマージン設定 */
+            @page { size: A4 portrait; margin: 0mm; }
+            body { -webkit-print-color-adjust: exact; margin: 0; }
             .no-print { display: none !important; }
             #print-area { display: block !important; width: 210mm; height: 297mm; padding: 15mm; box-sizing: border-box; background: white; color: black; }
             .print-container { border: 2px solid #eee; height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 10mm; box-sizing: border-box; }
-            .step-num { background: #d9534f !important; -webkit-print-color-adjust: exact; color: white !important; }
+            .step-num { background: #d9534f !important; color: white !important; }
             .instructions { padding: 25px; border-radius: 20px; text-align: left; background: #f9f9f9; border: 2px dashed #ccc; }
             .step { display: flex; align-items: center; margin-bottom: 20px; }
             .step-num { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: bold; margin-right: 20px; }
@@ -117,7 +119,7 @@
 <div id="print-area">
     <div class="print-container">
         <div style="text-align:center;">
-            <p style="font-size: 1.4rem;">用件入力ナースコール</p>
+            <p style="font-size: 1.4rem;">スマホでコール</p>
             <h1 style="font-size:4.5rem; margin:10px 0;" id="out-room">---</h1>
             <p id="out-name" style="font-size: 2rem;"></p>
             <div id="qrcode" style="display:flex; justify-content:center; margin:30px 0;"></div>
@@ -326,9 +328,22 @@
         }
     };
 
+    // --- デスクトップ通知を送信する関数 ---
+    function sendDesktopNotification(title, body) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(title, { body: body });
+        }
+    }
+
     // --- メイン受信処理 ---
     window.startApp = () => {
         document.getElementById('start-overlay').style.display = 'none';
+
+        // 受信開始時にバックグラウンド通知の許可をブラウザにリクエスト
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+
         const q = query(collection(db, "calls"), orderBy("createdAt", "desc"), limit(300));
         
         onSnapshot(q, { includeMetadataChanges: false }, (snapshot) => {
@@ -343,7 +358,6 @@
                     card.className = `card ${data.priority}`;
                     card.id = `card-${id}`;
 
-                    // 「急がない」などの状況を分かりやすくカードに表示
                     let badgeHtml = "";
                     if (data.priority === 'urgent') badgeHtml = '<span class="priority-badge badge-urgent">🚨 緊急</span>';
                     else if (data.priority === 'normal') badgeHtml = '<span class="priority-badge badge-normal">🟡 急がない</span>';
@@ -359,11 +373,14 @@
                     `;
                     board.insertBefore(card, board.firstChild);
 
+                    // 通知音再生 ＋ デスクトップ(バックグラウンド)通知表示
                     if (data.priority === 'urgent') {
                         urgentAudio.play().catch(() => {});
                         document.getElementById('stop-alarm-btn').style.display = 'block';
+                        sendDesktopNotification('🚨 緊急コール', `${data.room}から緊急の呼び出しです`);
                     } else {
                         normalAudio.play().catch(() => {});
+                        sendDesktopNotification('🔔 呼び出し', `${data.room}: ${data.menu.join(' / ')}`);
                     }
                 }
                 if (change.type === "removed") {
