@@ -137,6 +137,18 @@
         <button class="start-btn" onclick="startApp()">受信を開始する</button>
     </div>
 
+    <div id="lock-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a0a; z-index:3000; color:#666; flex-direction:column; justify-content:center; align-items:center; user-select:none; -webkit-user-select:none; touch-action:none;">
+        <div style="font-size:4rem; margin-bottom:10px;">🔒</div>
+        <div style="font-size:1.2rem; font-weight:bold; color:#888; margin-bottom:5px;">画面ロックモード</div>
+        <div style="font-size:0.9rem; color:#555;">常時点灯と受信システムは動作しています</div>
+        <div style="margin-top:35px; font-size:0.9rem; color:#aaa; background:#222; padding:10px 20px; border-radius:50px; box-shadow:0 2px 5px rgba(0,0,0,0.5);">
+            解除方法：画面を長押し（2秒）
+        </div>
+        <div style="width:160px; height:4px; background:#222; margin-top:20px; border-radius:2px; overflow:hidden;">
+            <div id="lock-progress" style="width:0%; height:100%; background:#007bff;"></div>
+        </div>
+    </div>
+
     <div class="header-bar">
         <div class="nav-icons">
             <button class="icon-btn active" id="btn-board" onclick="switchTab('board-section', this)">📋</button>
@@ -145,6 +157,7 @@
         </div>
         <div class="header-controls">
             <button id="stop-alarm-btn" class="stop-alarm-btn" onclick="stopAlarm()">🔕</button>
+            <button class="night-toggle" onclick="enterLockMode()" title="画面ロック（擬似スリープ）">🔒</button>
             <button class="night-toggle" onclick="toggleNightMode()">🌙</button>
         </div>
     </div>
@@ -354,6 +367,57 @@
         }
     });
 
+    // --- 擬似スリープ（画面ロック）機能の制御 ---
+    const lockOverlay = document.getElementById('lock-overlay');
+    const lockProgress = document.getElementById('lock-progress');
+    let lockTimer = null;
+    const lockDuration = 2000; // 2秒（2000ミリ秒）
+
+    window.enterLockMode = () => {
+        lockOverlay.style.display = 'flex';
+    };
+
+    window.exitLockMode = () => {
+        lockOverlay.style.display = 'none';
+        resetLockProgress();
+    };
+
+    function startLockTimeout(e) {
+        if (e.cancelable) e.preventDefault();
+        
+        lockProgress.style.transition = 'none';
+        lockProgress.style.width = '0%';
+        lockProgress.offsetHeight; // リフローを強制して即時リセットを反映
+        
+        lockProgress.style.transition = `width ${lockDuration}ms linear`;
+        lockProgress.style.width = '100%';
+
+        lockTimer = setTimeout(() => {
+            window.exitLockMode();
+        }, lockDuration);
+    }
+
+    function cancelLockTimeout() {
+        clearTimeout(lockTimer);
+        resetLockProgress();
+    }
+
+    function resetLockProgress() {
+        lockProgress.style.transition = 'none';
+        lockProgress.style.width = '0%';
+    }
+
+    // マウスイベントでの解除処理
+    lockOverlay.addEventListener('mousedown', startLockTimeout);
+    lockOverlay.addEventListener('mouseup', cancelLockTimeout);
+    lockOverlay.addEventListener('mouseleave', cancelLockTimeout);
+
+    // スマホのタッチイベントでの解除処理
+    lockOverlay.addEventListener('touchstart', startLockTimeout, { passive: false });
+    lockOverlay.addEventListener('touchend', cancelLockTimeout);
+    lockOverlay.addEventListener('touchcancel', cancelLockTimeout);
+
+
     // --- メイン受信処理 ---
     window.startApp = async () => {
         document.getElementById('start-overlay').style.display = 'none';
@@ -376,6 +440,9 @@
                 const id = change.doc.id;
 
                 if (change.type === "added") {
+                    // コールが入ったら自動的に画面ロック（擬似スリープ）を解除する
+                    window.exitLockMode();
+
                     const card = document.createElement('div');
                     card.className = `card ${data.priority}`;
                     card.id = `card-${id}`;
