@@ -97,7 +97,6 @@
         /* --- 印刷用 --- */
         #print-area { display: none; }
         @media print {
-            /* フッターとヘッダーの印刷を消すためのマージン設定 */
             @page { size: A4 portrait; margin: 0mm; }
             body { -webkit-print-color-adjust: exact; margin: 0; }
             .no-print { display: none !important; }
@@ -335,9 +334,32 @@
         }
     }
 
+    // --- スリープ防止（常時点灯）処理 ---
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('スリープ防止が有効になりました');
+            }
+        } catch (err) {
+            console.warn(`スリープ防止機能の起動に失敗しました: ${err.message}`);
+        }
+    }
+
+    // 別のアプリからブラウザに戻ってきたときにスリープ防止を再適用する
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            await requestWakeLock();
+        }
+    });
+
     // --- メイン受信処理 ---
-    window.startApp = () => {
+    window.startApp = async () => {
         document.getElementById('start-overlay').style.display = 'none';
+
+        // 受信開始時にスリープ防止を要求
+        await requestWakeLock();
 
         // 受信開始時にバックグラウンド通知の許可をブラウザにリクエスト
         if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
