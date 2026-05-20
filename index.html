@@ -422,6 +422,22 @@
     window.startApp = async () => {
         document.getElementById('start-overlay').style.display = 'none';
 
+        // 💡音声の「空打ち」をしてブラウザの自動再生制限を解除する
+        urgentAudio.muted = true;
+        normalAudio.muted = true;
+
+        urgentAudio.play().then(() => {
+            urgentAudio.pause();
+            urgentAudio.currentTime = 0;
+            urgentAudio.muted = false; 
+        }).catch(() => {});
+
+        normalAudio.play().then(() => {
+            normalAudio.pause();
+            normalAudio.currentTime = 0;
+            normalAudio.muted = false; 
+        }).catch(() => {});
+
         // 受信開始時にスリープ防止を要求
         await requestWakeLock();
 
